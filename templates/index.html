@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Planner - События</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 10px; }
+        input { padding: 8px; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; cursor: pointer; margin-top: 5px; border: none; border-radius: 4px; background: #007bff; color: white; }
+        button:hover { background: #0056b3; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .event-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background: #fafafa; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        hr { border: 0; border-top: 1px solid #ddd; margin: 20px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Planner API — Игнатченко Владислав</h1>
+
+    <!-- Блок Авторизации -->
+    <div style="border: 1px solid #007bff; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+        <h2>Авторизация</h2>
+        <div class="form-group">
+            <input type="email" id="auth-email" placeholder="Email">
+        </div>
+        <div class="form-group">
+            <input type="password" id="auth-password" placeholder="Пароль">
+        </div>
+        <div class="form-group">
+            <input type="text" id="auth-username" placeholder="Имя (для регистрации)">
+        </div>
+        <button onclick="signUp()">Регистрация (Sign Up)</button>
+        <button onclick="signIn()" style="background: #28a745;">Вход (Sign In)</button>
+        <p id="auth-message"></p>
+    </div>
+
+    <hr>
+
+    <!-- Блок Событий -->
+    <div>
+        <h2>События</h2>
+        <button class="btn-danger" onclick="deleteAllEvents()">Удалить ВСЕ события</button>
+        <div id="events-list" style="margin-top: 15px;"></div>
+
+        <h3>Создать новое событие</h3>
+        <div class="form-group"><input type="text" id="ev-title" placeholder="Название"></div>
+        <div class="form-group"><input type="text" id="ev-image" placeholder="Ссылка на картинку (URL)"></div>
+        <div class="form-group"><input type="text" id="ev-desc" placeholder="Описание"></div>
+        <div class="form-group"><input type="text" id="ev-tags" placeholder="Теги (через запятую)"></div>
+        <div class="form-group"><input type="text" id="ev-loc" placeholder="Локация"></div>
+        <button onclick="createEvent()" style="background: #28a745;">Создать событие</button>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000";
+
+    // 1. Регистрация
+    async function signUp() {
+        const data = {
+            email: document.getElementById('auth-email').value,
+            password: document.getElementById('auth-password').value,
+            username: document.getElementById('auth-username').value,
+            events: []
+        };
+        const res = await fetch(`${API_URL}/user/signup`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        const msgEl = document.getElementById('auth-message');
+        msgEl.innerText = json.message || json.detail;
+        msgEl.className = res.ok ? 'success' : 'error';
+    }
+
+    // 2. Вход
+    async function signIn() {
+        const data = {
+            email: document.getElementById('auth-email').value,
+            password: document.getElementById('auth-password').value
+        };
+        const res = await fetch(`${API_URL}/user/signin`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        const msgEl = document.getElementById('auth-message');
+        msgEl.innerText = json.message || json.detail;
+        msgEl.className = res.ok ? 'success' : 'error';
+    }
+
+    // 3. Загрузка всех событий
+    async function loadEvents() {
+        const res = await fetch(`${API_URL}/event/`);
+        const events = await res.json();
+        const list = document.getElementById('events-list');
+        list.innerHTML = '';
+        
+        if (events.length === 0) {
+            list.innerHTML = '<p>Событий пока нет.</p>';
+            return;
+        }
+
+        events.forEach(ev => {
+            list.innerHTML += `
+                <div class="event-card">
+                    <h3>${ev.title}</h3>
+                    <p><b>ID:</b> ${ev.id} | <b>Локация:</b> ${ev.location}</p>
+                    <p>${ev.description}</p>
+                    <img src="${ev.image}" width="150" alt="img" style="border-radius: 4px;">
+                    <p><b>Теги:</b> ${ev.tags ? ev.tags.join(', ') : ''}</p>
+                    <button class="btn-danger" onclick="deleteEvent(${ev.id})">Удалить</button>
+                </div>
+            `;
+        });
+    }
+
+    // 4. Создание события
+    async function createEvent() {
+        const tagsStr = document.getElementById('ev-tags').value;
+        const data = {
+            id: Date.now(), // Генерируем уникальный ID
+            title: document.getElementById('ev-title').value,
+            image: document.getElementById('ev-image').value,
+            description: document.getElementById('ev-desc').value,
+            tags: tagsStr ? tagsStr.split(',').map(t => t.trim()) : [],
+            location: document.getElementById('ev-loc').value
+        };
+        const res = await fetch(`${API_URL}/event/new`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if (res.ok) {
+            alert("Событие успешно создано!");
+            // Очищаем поля
+            document.getElementById('ev-title').value = '';
+            document.getElementById('ev-image').value = '';
+            document.getElementById('ev-desc').value = '';
+            document.getElementById('ev-tags').value = '';
+            document.getElementById('ev-loc').value = '';
+            loadEvents();
+        } else {
+            alert("Ошибка при создании события!");
+        }
+    }
+
+    // 5. Удаление одного события
+    async function deleteEvent(id) {
+        if (!confirm("Удалить это событие?")) return;
+        await fetch(`${API_URL}/event/${id}`, { method: 'DELETE' });
+        loadEvents();
+    }
+
+    // 6. Удаление всех событий
+    async function deleteAllEvents() {
+        if (!confirm("Вы уверены, что хотите удалить ВСЕ события?")) return;
+        await fetch(`${API_URL}/event/`, { method: 'DELETE' });
+        loadEvents();
+    }
+
+    // При загрузке страницы сразу показываем события
+    window.onload = loadEvents;
+</script>
+</body>
+</html>
